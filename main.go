@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // import pflag to parse args
@@ -13,6 +15,15 @@ import (
 
 const (
 	MarkDownExt = ".md"
+
+	TimeFormat = "2006-01-02T15:04:05+07:00"
+	DocHeader  = `+++
+title = '%s'
+date = %s
+draft = false
++++
+
+`
 )
 
 func main() {
@@ -50,7 +61,7 @@ func GetFiles(dir string) ([]string, error) {
 		if !strings.HasSuffix(name, MarkDownExt) {
 			continue
 		}
-		files = append(files, item.Name())
+		files = append(files, filepath.Join(dir, item.Name()))
 	}
 
 	return files, nil
@@ -73,13 +84,16 @@ func TransferReadList(files []string, destDir string) error {
 		}
 
 		month := date[:6]
-		outputFile := filepath.Join(destDir, month)
+		outputFile := filepath.Join(destDir, month+".md")
 		if _, ok := visitedMonth[month]; !ok {
 			fmt.Printf("Need to create new file: %s\n", outputFile)
 			visitedMonth[month] = struct{}{}
+			err = MakeMonthFile(destDir, month)
+			if err != nil {
+				return err
+			}
 		}
-		fmt.Printf("Transfer file: %s to %s\n", file, outputFile)
-
+		AppendReadList(file, outputFile, date)
 	}
 
 	return nil
@@ -93,14 +107,64 @@ func MakeMonthFile(destDir, month string) error {
 	}
 	defer file.Close()
 
-	str := "# Read List of " + month + "\n"
-
 	// This is hugo file header
-	str += fmt.Sprintf(" %s\n", month)
+	current := time.Now().Format(TimeFormat)
+	str := fmt.Sprintf(DocHeader, month, current)
+	// str := "# Read List of " + month + "\n"
+
 	// write some content to the file
-	_, err = file.WriteString(fmt.Sprintf("# Read List of %s\n", month))
+	_, err = file.WriteString(str)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func AppendReadList(src, dst, date string) error {
+	// append the content to the file
+	fmt.Printf("Transfer file: %s to %s\n", src, dst)
+
+	// open the src file
+	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	// write to dst file
+	dstFile, err := os.OpenFile(dst, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	hasStart := false
+	scanner := bufio.NewScanner(srcFile)
+	var lines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "## ") {
+			if hasStart {
+				break
+			}
+			if strings.HasPrefix(line, "## Readlist") {
+				hasStart = true
+				continue
+			}
+		}
+		if hasStart {
+			trimed := strings.TrimSpace(line)
+			if len(trimed) == 0 || trimed == "-" {
+				continue
+			}
+			lines = append(lines, line)
+		}
+	}
+
+	if len(lines) > 0 {
+		dstFile.WriteString(fmt.Sprintf("## %s\n\n%s\n\n", date, strings.Join(lines, "\n")))
+		fmt.Printf("  Total %d lines\n", len(lines))
+	}
+
 	return nil
 }
