@@ -16,7 +16,7 @@ import (
 const (
 	MarkDownExt = ".md"
 
-	TimeFormat = "2006-01-02T15:04:05+07:00"
+	TimeFormat = "2006-01-02T15:04:05+08:00"
 	DocHeader  = `+++
 title = 'ReadList - %s'
 date = %s
@@ -39,10 +39,13 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Print(files)
+	// fmt.Print(files)
+	fmt.Printf("Total %d files\n", len(files))
 
-	TransferReadList(files, outputDir)
-
+	err = TransferReadList(files, outputDir)
+	if err != nil {
+		fmt.Printf("Failed to transfer, err: %v\n", err)
+	}
 }
 
 func GetFiles(dir string) ([]string, error) {
