@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -83,7 +84,8 @@ func TransferReadList(files []string, destDir string) error {
 		return err
 	}
 
-	for _, file := range files {
+	for i := 0; i < len(files); i++ {
+		file := files[len(files)-1-i]
 		date := re.FindString(file)
 		if date == "" {
 			continue
@@ -91,7 +93,10 @@ func TransferReadList(files []string, destDir string) error {
 
 		month := date[:6]
 		outputFile := filepath.Join(destDir, month+".md")
-		AppendReadList(file, outputFile, date)
+		err := AppendReadList(file, outputFile, date)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -106,13 +111,14 @@ func MakeMonthFile(name, date string) error {
 	defer file.Close()
 
 	// This is hugo file header
-	current := time.Now().Format(TimeFormat)
-	_, err = file.WriteString(fmt.Sprintf(DocHeader, date, current))
+	t, err := normalizeDate(date)
 	if err != nil {
 		return err
 	}
-
-	return nil
+	s := fmt.Sprintf(DocHeader, date[:6], t.Format(TimeFormat))
+	// fmt.Printf("List: %s\n", s)
+	_, err = file.WriteString(s)
+	return err
 }
 
 func AppendReadList(src, dst, date string) error {
@@ -131,6 +137,8 @@ func AppendReadList(src, dst, date string) error {
 	var lines []string
 	for scanner.Scan() {
 		line := scanner.Text()
+
+		// Only extract readlist section
 		if strings.HasPrefix(line, "## ") {
 			if hasStart {
 				break
@@ -140,6 +148,13 @@ func AppendReadList(src, dst, date string) error {
 				continue
 			}
 		}
+
+		// if meet "---" inline then omit this line
+		if strings.Contains(line, "---") {
+			continue
+		}
+
+		// omit empty line(have no content but a dash '-')
 		if hasStart {
 			trimed := strings.TrimSpace(line)
 			if len(trimed) == 0 || trimed == "-" {
@@ -157,7 +172,7 @@ func AppendReadList(src, dst, date string) error {
 	if _, ok := visitedMonth[month]; !ok {
 		fmt.Printf("Need to create new file: %s\n", filepath.Base(dst))
 		visitedMonth[month] = struct{}{}
-		err = MakeMonthFile(dst, month)
+		err = MakeMonthFile(dst, date)
 		if err != nil {
 			return err
 		}
@@ -174,4 +189,30 @@ func AppendReadList(src, dst, date string) error {
 	fmt.Printf("Src: %v\n  Total %d lines\n", filepath.Base(src), len(lines))
 
 	return nil
+}
+
+func normalizeDate(date string) (time.Time, error) {
+
+	month, err := strconv.ParseInt(date[:6], 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	now := time.Now()
+	nowMonth := int64(now.Year()*100 + int(now.Month()))
+
+	fmt.Printf("Now: %v, month: %v\n", nowMonth, month)
+
+	if month >= nowMonth {
+		return time.Now(), nil
+	}
+
+	t, err := time.Parse("20060102", date)
+	if err != nil {
+		return time.Time{}, err
+	}
+	nextMonth := t.AddDate(0, 1, 0)
+	nextMonthStart := time.Date(nextMonth.Year(), nextMonth.Month(), 1, 0, 0, 0, 0, nextMonth.Location())
+
+	return nextMonthStart, nil
 }
