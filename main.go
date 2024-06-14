@@ -26,6 +26,10 @@ draft = false
 `
 )
 
+var (
+	visitedMonth = map[string]struct{}{}
+)
+
 func main() {
 
 	if len(os.Args) < 3 {
@@ -79,7 +83,6 @@ func TransferReadList(files []string, destDir string) error {
 		return err
 	}
 
-	visitedMonth := map[string]struct{}{}
 	for _, file := range files {
 		date := re.FindString(file)
 		if date == "" {
@@ -88,23 +91,15 @@ func TransferReadList(files []string, destDir string) error {
 
 		month := date[:6]
 		outputFile := filepath.Join(destDir, month+".md")
-		if _, ok := visitedMonth[month]; !ok {
-			fmt.Printf("Need to create new file: %s\n", outputFile)
-			visitedMonth[month] = struct{}{}
-			err = MakeMonthFile(destDir, month)
-			if err != nil {
-				return err
-			}
-		}
 		AppendReadList(file, outputFile, date)
 	}
 
 	return nil
 }
 
-func MakeMonthFile(destDir, month string) error {
+func MakeMonthFile(name, date string) error {
 	// create a file
-	file, err := os.Create(filepath.Join(destDir, month+".md"))
+	file, err := os.Create(name)
 	if err != nil {
 		return err
 	}
@@ -112,20 +107,17 @@ func MakeMonthFile(destDir, month string) error {
 
 	// This is hugo file header
 	current := time.Now().Format(TimeFormat)
-	str := fmt.Sprintf(DocHeader, month, current)
-	// str := "# Read List of " + month + "\n"
-
-	// write some content to the file
-	_, err = file.WriteString(str)
+	_, err = file.WriteString(fmt.Sprintf(DocHeader, date, current))
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func AppendReadList(src, dst, date string) error {
 	// append the content to the file
-	fmt.Printf("Transfer file: %s to %s\n", src, dst)
+	// fmt.Printf("Transfer file: %s to %s\n", src, dst)
 
 	// open the src file
 	srcFile, err := os.OpenFile(src, os.O_RDONLY, 0644)
@@ -133,13 +125,6 @@ func AppendReadList(src, dst, date string) error {
 		return err
 	}
 	defer srcFile.Close()
-
-	// write to dst file
-	dstFile, err := os.OpenFile(dst, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
 
 	hasStart := false
 	scanner := bufio.NewScanner(srcFile)
@@ -164,10 +149,29 @@ func AppendReadList(src, dst, date string) error {
 		}
 	}
 
-	if len(lines) > 0 {
-		dstFile.WriteString(fmt.Sprintf("## %s\n\n%s\n\n", date, strings.Join(lines, "\n")))
-		fmt.Printf("  Total %d lines\n", len(lines))
+	if len(lines) == 0 {
+		return nil
 	}
+
+	month := date[:6]
+	if _, ok := visitedMonth[month]; !ok {
+		fmt.Printf("Need to create new file: %s\n", filepath.Base(dst))
+		visitedMonth[month] = struct{}{}
+		err = MakeMonthFile(dst, month)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write to dst file
+	dstFile, err := os.OpenFile(dst, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	dstFile.WriteString(fmt.Sprintf("## %s\n\n%s\n\n", date, strings.Join(lines, "\n")))
+	fmt.Printf("Src: %v\n  Total %d lines\n", filepath.Base(src), len(lines))
 
 	return nil
 }
