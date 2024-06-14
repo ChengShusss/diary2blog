@@ -18,7 +18,7 @@ const (
 
 	TimeFormat = "2006-01-02T15:04:05+07:00"
 	DocHeader  = `+++
-title = '%s'
+title = 'ReadList - %s'
 date = %s
 draft = false
 +++
