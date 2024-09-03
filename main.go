@@ -22,8 +22,10 @@ const (
 title = 'ReadList - %s'
 date = %s
 draft = false
+description = "阿树%s的阅读记录，谨供参考"
 +++
 
+> "本文是阿树%s的阅读记录，仅供参考，不对真实性和有效性作任何保障。"
 `
 )
 
@@ -115,7 +117,10 @@ func MakeMonthFile(name, date string) error {
 	if err != nil {
 		return err
 	}
-	s := fmt.Sprintf(DocHeader, date[:6], t.Format(TimeFormat))
+	yearStr := date[:4]
+	monthStr := date[4:6]
+	formatStr := fmt.Sprintf(" %s 年 %s 月", yearStr, monthStr)
+	s := fmt.Sprintf(DocHeader, date[:6], t.Format(TimeFormat), formatStr, formatStr)
 	// fmt.Printf("List: %s\n", s)
 	_, err = file.WriteString(s)
 	return err
@@ -207,7 +212,7 @@ func normalizeDate(date string) (time.Time, error) {
 		return time.Now(), nil
 	}
 
-	t, err := time.Parse("20060102", date)
+	t, err := time.Parse("200601", date[:6])
 	if err != nil {
 		return time.Time{}, err
 	}

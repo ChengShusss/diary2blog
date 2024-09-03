@@ -23,7 +23,21 @@ func TestNormalizeTime(t *testing.T) {
 			args: args{
 				s: "20230101",
 			},
-			want:    time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
+			want:    time.Date(2023, 2, 1, 0, 0, 0, 0, time.UTC),
+			wantErr: false,
+		}, {
+			name: "test",
+			args: args{
+				s: "20230228",
+			},
+			want:    time.Date(2023, 3, 1, 0, 0, 0, 0, time.UTC),
+			wantErr: false,
+		}, {
+			name: "test",
+			args: args{
+				s: "20230531",
+			},
+			want:    time.Date(2023, 6, 1, 0, 0, 0, 0, time.UTC),
 			wantErr: false,
 		},
 	}
